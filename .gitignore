@@ -1,0 +1,13 @@
+# Streamlit secrets
+.streamlit/
+
+# Python cache/compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment folders (Beispiele, passe sie ggf. an)
+venv/
+.venv/
+env/

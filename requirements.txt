@@ -1,0 +1,11 @@
+# requirements.txt
+
+streamlit
+pandas
+requests
+folium
+streamlit-folium
+plotly
+scikit-learn
+numpy
+google-generativeai
