@@ -500,44 +500,44 @@ if (st.session_state.get(config.STATE_SHOW_LLM_RESULTS) and
 
 # --- UI: Hauptbereich Layout (Karte und Wetter) ---
 # Requirement 3: Visualisierung von Karte und Wetterdaten
-#col_map, col_weather = st.columns([2, 1], gap="large")
+col_map, col_weather = st.columns([2, 1], gap="large")
 
-#with col_map:
- #   df_map_display = pd.DataFrame()
-  #  current_selection_id = st.session_state.get(config.STATE_SELECTED_ACTIVITY_INDEX)
-   # explicit_rec_ids = st.session_state.get(config.STATE_EXPLICIT_RECOMMENDATIONS)
+with col_map:
+    df_map_display = pd.DataFrame()
+    current_selection_id = st.session_state.get(config.STATE_SELECTED_ACTIVITY_INDEX)
+    explicit_rec_ids = st.session_state.get(config.STATE_EXPLICIT_RECOMMENDATIONS)
 
-    #if explicit_rec_ids is not None: # Fall 1: Zeige explizite Profil-Empfehlungen
-     #   if explicit_rec_ids and not df_activities.empty:
-      #      valid_explicit_ids = [int(i) for i in explicit_rec_ids if isinstance(i, (int, float)) and pd.notna(i)]
-       #     df_map_display = df_activities[df_activities[config.COL_ID].isin(valid_explicit_ids)].copy()
-        #    if weather_data_map and config.COL_ID in df_activities.columns:
-         #        id_to_idx = {row[config.COL_ID]: index for index, row in df_activities.iterrows() if pd.notna(row[config.COL_ID])}
-          #       df_map_display['weather_note'] = df_map_display[config.COL_ID].map(lambda i: weather_data_map.get(id_to_idx.get(i, -1), {}).get('note'))
+    if explicit_rec_ids is not None: # Fall 1: Zeige explizite Profil-Empfehlungen
+        if explicit_rec_ids and not df_activities.empty:
+            valid_explicit_ids = [int(i) for i in explicit_rec_ids if isinstance(i, (int, float)) and pd.notna(i)]
+            df_map_display = df_activities[df_activities[config.COL_ID].isin(valid_explicit_ids)].copy()
+            if weather_data_map and config.COL_ID in df_activities.columns:
+                 id_to_idx = {row[config.COL_ID]: index for index, row in df_activities.iterrows() if pd.notna(row[config.COL_ID])}
+                 df_map_display['weather_note'] = df_map_display[config.COL_ID].map(lambda i: weather_data_map.get(id_to_idx.get(i, -1), {}).get('note'))
 
-    #elif st.session_state.get(config.STATE_SHOW_LLM_RESULTS) and isinstance(st.session_state.get(config.STATE_LLM_SUGGESTION_IDS), list):
+    elif st.session_state.get(config.STATE_SHOW_LLM_RESULTS) and isinstance(st.session_state.get(config.STATE_LLM_SUGGESTION_IDS), list):
         # Fall 2: Zeige LLM-Vorschläge
-     #   suggestion_ids = st.session_state.get(config.STATE_LLM_SUGGESTION_IDS, [])
-      #  if suggestion_ids and not df_activities.empty:
-       #     valid_suggestion_ids = [int(i) for i in suggestion_ids if isinstance(i, (int, float)) and pd.notna(i)]
-        #    df_map_display = df_activities[df_activities[config.COL_ID].isin(valid_suggestion_ids)].copy()
-         #   if weather_data_map and config.COL_ID in df_activities.columns:
-          #       id_to_idx = {row[config.COL_ID]: index for index, row in df_activities.iterrows() if pd.notna(row[config.COL_ID])}
-           #      df_map_display['weather_note'] = df_map_display[config.COL_ID].map(lambda i: weather_data_map.get(id_to_idx.get(i, -1), {}).get('note'))
+        suggestion_ids = st.session_state.get(config.STATE_LLM_SUGGESTION_IDS, [])
+        if suggestion_ids and not df_activities.empty:
+            valid_suggestion_ids = [int(i) for i in suggestion_ids if isinstance(i, (int, float)) and pd.notna(i)]
+            df_map_display = df_activities[df_activities[config.COL_ID].isin(valid_suggestion_ids)].copy()
+            if weather_data_map and config.COL_ID in df_activities.columns:
+                 id_to_idx = {row[config.COL_ID]: index for index, row in df_activities.iterrows() if pd.notna(row[config.COL_ID])}
+                 df_map_display['weather_note'] = df_map_display[config.COL_ID].map(lambda i: weather_data_map.get(id_to_idx.get(i, -1), {}).get('note'))
 
-   # elif not final_filtered_df.empty:
+    elif not final_filtered_df.empty:
         # Fall 3: Zeige die normal gefilterten Ergebnisse
-    #    df_map_display = final_filtered_df
+        df_map_display = final_filtered_df
 
-    #display_map(df_map_display, selected_activity_id=current_selection_id)
+    display_map(df_map_display, selected_activity_id=current_selection_id)
 
-with col_weather:
-    forecast_list_sg = None
-    if config.OPENWEATHERMAP_API_CONFIGURED and datum is not None:
-        forecast_list_sg = get_weather_forecast_for_day(
-            api_key=config.OPENWEATHERMAP_API_KEY, lat=config.ST_GALLEN_LAT, lon=config.ST_GALLEN_LON, target_date=datum
-        )
-    display_weather_overview(location_name="St. Gallen", target_date=datum, forecast_list=forecast_list_sg, api_configured=config.OPENWEATHERMAP_API_CONFIGURED)
+#with col_weather:
+ #   forecast_list_sg = None
+  #  if config.OPENWEATHERMAP_API_CONFIGURED and datum is not None:
+   #     forecast_list_sg = get_weather_forecast_for_day(
+    #        api_key=config.OPENWEATHERMAP_API_KEY, lat=config.ST_GALLEN_LAT, lon=config.ST_GALLEN_LON, target_date=datum
+     #   )
+   # display_weather_overview(location_name="St. Gallen", target_date=datum, forecast_list=forecast_list_sg, api_configured=config.OPENWEATHERMAP_API_CONFIGURED)
 
 # --- UI: Aktivitätenliste (Dynamischer Inhalt) ---
 st.markdown("---")
