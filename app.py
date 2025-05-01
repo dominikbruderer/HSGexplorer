@@ -67,9 +67,6 @@ except ImportError as e:
 # Seitenkonfiguration (Titel, Layout, Icon)
 st.set_page_config(page_title="HSGexplorer", layout="wide", page_icon="🗺️")
 
-if 'filters_applied_once' not in st.session_state:
-    st.session_state['filters_applied_once'] = False
-
 # Initialisiere Session State mit Defaults aus config.py, falls noch nicht vorhanden
 # Der Session State speichert den Zustand der App zwischen Interaktionen
 # print("DEBUG: Initializing session state...")
@@ -435,9 +432,6 @@ final_filtered_df = pd.DataFrame(columns=columns_to_use)
 weather_data_map: Dict[int, Dict[str, Any]] = {}
 df_with_weather_cols = pd.DataFrame(columns=list(columns_to_use) + ['weather_note', 'location_temp', 'location_icon', 'location_desc'])
 
-if aktivitaetsart_filter != "Alle" or personen_filter != "Alle" or budget_filter is not None or consider_weather_filter:
-     st.session_state['filters_applied_once'] = True
-
 # Führe Filterung nur aus, wenn Daten und Datum vorhanden sind
 if not df_activities.empty and datum is not None:
     # print("INFO: Wende Basisfilter an...")
@@ -512,10 +506,6 @@ with col_map:
     df_map_display = pd.DataFrame()
     current_selection_id = st.session_state.get(config.STATE_SELECTED_ACTIVITY_INDEX)
     explicit_rec_ids = st.session_state.get(config.STATE_EXPLICIT_RECOMMENDATIONS)
-    initial_load = not st.session_state.get('filters_applied_once', False) # Prüfe unser neues Flag
-
-    # Temporäre Begrenzung für initialen Ladevorgang
-    INITIAL_MAP_LIMIT = 10 # Zeige max. 10 Marker beim ersten Laden
 
     if explicit_rec_ids is not None: # Fall 1: Zeige explizite Profil-Empfehlungen
         if explicit_rec_ids and not df_activities.empty:
@@ -538,11 +528,6 @@ with col_map:
     elif not final_filtered_df.empty:
         # Fall 3: Zeige die normal gefilterten Ergebnisse
         df_map_display = final_filtered_df
-
-        # Wenn es der initiale Ladevorgang ist UND wir viele Ergebnisse haben, begrenze sie *nur für die Karte*
-        if initial_load and len(df_map_display) > INITIAL_MAP_LIMIT:
-            print(f"INFO: Begrenze initiale Kartenanzeige auf {INITIAL_MAP_LIMIT} Marker.")
-            df_map_display = df_map_display.head(INITIAL_MAP_LIMIT)
 
     display_map(df_map_display, selected_activity_id=current_selection_id)
 
