@@ -257,7 +257,7 @@ if not st.session_state.get(config.STATE_RECOMMENDATIONS_TO_SHOW_IDS):
 # --- UI: Personalisierte Vorschläge & Präferenzen (im Expander) ---
 st.markdown("---")
 # Requirement 4 & 5: Interaktive Empfehlungs- und Lernkomponente
-with st.expander("✨ Personalisierte Vorschläge (ausprobieren!)", expanded=False):
+with st.expander("✨ Personalisierte Vorschläge (ausprobieren!)", expanded=True):
     recommendation_ids_for_card = st.session_state.get(config.STATE_RECOMMENDATIONS_TO_SHOW_IDS, [])
     col_card, col_viz = st.columns([1, 1]) # Zwei Spalten Layout
 
