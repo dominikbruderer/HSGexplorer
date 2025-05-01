@@ -531,13 +531,13 @@ if (st.session_state.get(config.STATE_SHOW_LLM_RESULTS) and
 
     #display_map(df_map_display, selected_activity_id=current_selection_id)
 
-#with col_weather:
- #   forecast_list_sg = None
-  #  if config.OPENWEATHERMAP_API_CONFIGURED and datum is not None:
-   #     forecast_list_sg = get_weather_forecast_for_day(
-    #        api_key=config.OPENWEATHERMAP_API_KEY, lat=config.ST_GALLEN_LAT, lon=config.ST_GALLEN_LON, target_date=datum
-     #   )
-    #display_weather_overview(location_name="St. Gallen", target_date=datum, forecast_list=forecast_list_sg, api_configured=config.OPENWEATHERMAP_API_CONFIGURED)
+with col_weather:
+    forecast_list_sg = None
+    if config.OPENWEATHERMAP_API_CONFIGURED and datum is not None:
+        forecast_list_sg = get_weather_forecast_for_day(
+            api_key=config.OPENWEATHERMAP_API_KEY, lat=config.ST_GALLEN_LAT, lon=config.ST_GALLEN_LON, target_date=datum
+        )
+    display_weather_overview(location_name="St. Gallen", target_date=datum, forecast_list=forecast_list_sg, api_configured=config.OPENWEATHERMAP_API_CONFIGURED)
 
 # --- UI: Aktivitätenliste (Dynamischer Inhalt) ---
 st.markdown("---")
