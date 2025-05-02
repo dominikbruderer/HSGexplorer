@@ -101,23 +101,23 @@ def get_filters_from_gemini(
     try:
         # Initialisiere das Modell (Modellname könnte auch aus config kommen)
         model = genai.GenerativeModel(model_name='gemini-1.5-flash')
-        # Generiere die Antwort
+        # Generiere die Antwort vom LLM
         response = model.generate_content(prompt)
 
         # Bereinige die Antwort: Entferne mögliche Markdown-Code-Blöcke und Whitespace
         # Wichtig, falls das LLM die Anweisung "nur JSON" nicht perfekt befolgt.
-        # Strip() entfernt führende/folgende Leerzeichen/Zeilenumbrüche.
-        # lstrip/rstrip entfernt potentielle Markdown-Formatierung.
         cleaned_response = response.text.strip().lstrip('```json').rstrip('```').strip()
 
         # Versuche, die bereinigte Antwort als JSON zu parsen
         filter_dict = json.loads(cleaned_response)
 
         # --- Optionale Validierung der extrahierten Werte ---
+        # Prüfe, ob die vom LLM zurückgegebenen Werte auch wirklich erlaubt sind (gemäß config.py).
         # Entferne ungültige Werte oder ganze Schlüssel, wenn sie nicht den Vorgaben entsprechen.
         # Beispiel für 'Art':
         if 'Art' in filter_dict:
             if isinstance(filter_dict['Art'], list):
+                # Behalte nur die Arten, die in unserer erlaubten Liste stehen
                 valid_arten = [item for item in filter_dict['Art'] if item in config.LLM_POSSIBLE_ARTEN]
                 if not valid_arten: del filter_dict['Art'] # Entfernen, wenn keine gültige Art übrig bleibt
                 else: filter_dict['Art'] = valid_arten
@@ -127,9 +127,9 @@ def get_filters_from_gemini(
         # Beispiel für 'Personen_Anzahl_Kategorie':
         if 'Personen_Anzahl_Kategorie' in filter_dict:
             if filter_dict['Personen_Anzahl_Kategorie'] not in config.LLM_POSSIBLE_PERSONEN_KAT:
-                del filter_dict['Personen_Anzahl_Kategorie']
+                del filter_dict['Personen_Anzahl_Kategorie'] # Entfernen, wenn Wert nicht erlaubt
 
-        # (Hier ggf. Validierungen für Indoor_Outdoor, Wetter_Praeferenz, Zielgruppe hinzufügen)
+        # (Hier könnten analog Validierungen für Indoor_Outdoor, Wetter_Praeferenz, Zielgruppe folgen)
 
         # Beispiel für 'Preis_Max':
         if 'Preis_Max' in filter_dict:
@@ -137,21 +137,20 @@ def get_filters_from_gemini(
                 del filter_dict['Preis_Max'] # Entfernen, wenn es keine Zahl ist
 
         # print(f"DEBUG: Von Gemini extrahierte und validierte Filter: {filter_dict}")
-        return filter_dict, None # Erfolg
+        return filter_dict, None # Erfolg: Gib das validierte Dictionary zurück
 
     except json.JSONDecodeError:
-        # Fehler beim Parsen der LLM-Antwort
-        print(f"FEHLER: LLM (Filter) gab kein gültiges JSON zurück. Antwort:\n{cleaned_response}")
+        # Fehler, falls die Antwort des LLM kein gültiges JSON war.
+        # print(f"FEHLER: LLM (Filter) gab kein gültiges JSON zurück. Antwort:\n{cleaned_response}")
         return None, "Die Antwort der KI (Filter) war nicht im erwarteten Format. Versuche es anders zu formulieren."
     except Exception as e:
-        # Fange andere Fehler ab (API-Fehler, etc.)
-        print(f"FEHLER: Unerwarteter Fehler bei LLM (Filter) Kommunikation: {e}")
-        traceback.print_exc() # Für detaillierte Fehlersuche im Log
-        # Gib eine generische, aber informative Fehlermeldung zurück
+        # Fange andere Fehler ab (z.B. API nicht erreichbar, Kontingent überschritten).
+        # print(f"FEHLER: Unerwarteter Fehler bei LLM (Filter) Kommunikation: {e}")
+        # traceback.print_exc() # Nützlich für Entwickler zur Fehlersuche (gibt Details in Konsole aus)
         return None, f"Ein Fehler ist bei der Kommunikation mit der KI (Filter) aufgetreten: {type(e).__name__}"
 
 
-# Kein Caching hier, da candidate_info_string sich häufig ändert
+# Kein Caching hier (@st.cache_data), da die Kandidatenliste (candidate_info_string) sich ständig ändert.
 def get_selection_and_justification(
     user_query: str,
     candidate_info_string: str,
@@ -159,36 +158,34 @@ def get_selection_and_justification(
     num_suggestions: int = 5
     ) -> Tuple[Optional[List[int]], Optional[str], Optional[str]]:
     """
-    Wählt Top-Aktivitäten aus Kandidaten aus und generiert eine Begründung via Gemini.
+    Wählt passende Aktivitäten aus Kandidaten aus und begründet die Auswahl via Gemini.
 
-    Sendet die ursprüngliche `user_query` und eine formatierte Liste von Kandidaten
-    an das Gemini-Modell. Das LLM soll die besten `num_suggestions` Kandidaten anhand
-    ihrer IDs auswählen und eine textuelle Begründung liefern. Die Antwort wird als
-    spezifisches JSON-Objekt erwartet und validiert.
+    Sendet die ursprüngliche Nutzeranfrage und eine formatierte Liste von Kandidaten-
+    aktivitäten an das Gemini-Modell. Das LLM soll die besten `num_suggestions`
+    Kandidaten anhand ihrer IDs auswählen und eine textuelle Begründung liefern.
+    Die Antwort wird als spezifisches JSON-Objekt erwartet ({ "suggestion_ids": [...], "justification": "..." }).
 
     Args:
-        user_query (str): Die ursprüngliche natürlichsprachige Anfrage des Benutzers.
+        user_query (str): Die ursprüngliche natürlichsprachliche Anfrage des Benutzers.
         candidate_info_string (str): Ein String, der die Kandidatenaktivitäten
-            beschreibt (typischerweise von `app.py` generiert).
+            beschreibt (mit ID, Name, Art, Preis etc.).
         google_api_configured (bool): Flag, ob die Google AI API konfiguriert ist.
         num_suggestions (int): Maximale Anzahl der vorzuschlagenden Aktivitäts-IDs.
 
     Returns:
         Tuple[Optional[List[int]], Optional[str], Optional[str]]:
-        - suggestion_ids (Optional[List[int]]): Liste der IDs (Integer) der vom LLM
-          ausgewählten Aktivitäten (kann leer sein []), oder None bei Fehler.
-        - justification (Optional[str]): Die vom LLM generierte Begründung, oder None bei Fehler.
-        - error_message (Optional[str]): Fehlermeldung für den Benutzer bei
-          Problemen, sonst None.
+        - suggestion_ids (Optional[List[int]]): Liste der IDs (als Zahlen) der vom LLM
+          ausgewählten Aktivitäten. Kann leer sein ([]). Gibt None bei einem API-Fehler zurück.
+        - justification (Optional[str]): Die vom LLM generierte Begründung. Gibt None bei einem API-Fehler zurück.
+        - error_message (Optional[str]): Fehlermeldung für den Benutzer bei Problemen, sonst None.
     """
     if not google_api_configured:
         return None, None, "Google AI API Key nicht korrekt konfiguriert oder fehlt."
     if not user_query:
-        user_query = "deinem Wunsch" # Generischer Fallback
+        user_query = "deinem Wunsch" # Generischer Text, falls die Originalanfrage fehlt
     if not candidate_info_string:
-        # print("Debug: Keine Kandidaten für LLM-Vorschlagsgenerierung übergeben.")
-        # Dies ist kein technischer Fehler, aber das LLM kann nichts auswählen.
-        # Gib leere Liste und passende Begründung zurück, kein error_message.
+        # Wenn keine Kandidaten da sind, kann das LLM nichts auswählen.
+        # Das ist kein technischer Fehler, daher geben wir leere Liste und passende Begründung zurück.
         return [], "Es wurden keine Aktivitäten gefunden, die den Filterkriterien entsprechen, um Vorschläge zu machen.", None
 
     # --- Prompt Design für Vorschlagsgenerierung ---
@@ -227,11 +224,12 @@ def get_selection_and_justification(
 
     JSON-Ergebnis:
     """
-    # print(f"DEBUG: Sende Vorschlags-Prompt an Gemini...") # Prompt ist sehr lang
+    # print(f"DEBUG: Sende Vorschlags-Prompt an Gemini...") # Debug-Ausgabe (Prompt ist oft sehr lang)
 
     try:
         model = genai.GenerativeModel(model_name='gemini-1.5-flash')
         response = model.generate_content(prompt)
+        # Bereinige die Antwort wieder von möglichem Markdown etc.
         cleaned_response = response.text.strip().lstrip('```json').rstrip('```').strip()
 
         # Parse JSON
@@ -241,53 +239,51 @@ def get_selection_and_justification(
         suggestion_ids = result_dict.get("suggestion_ids")
         justification = result_dict.get("justification")
 
-        # Prüfe, ob Schlüssel vorhanden sind und die Typen korrekt sind
+        # Prüfe, ob beide Schlüssel vorhanden sind und die Typen stimmen (Liste von Zahlen, String).
         if isinstance(suggestion_ids, list) and \
            all(isinstance(i, int) for i in suggestion_ids) and \
            isinstance(justification, str):
-            # Erfolg: Korrektes Format erhalten
-            # Begrenze die Anzahl der IDs auf num_suggestions, falls das LLM mehr liefert
+            # Erfolg: Korrektes Format erhalten.
+            # Begrenze die Anzahl der IDs auf num_suggestions, falls das LLM mehr zurückgibt.
             # print(f"DEBUG: Von Gemini empfangene Vorschläge: IDs={suggestion_ids[:num_suggestions]}, Begründung='{justification}'")
-            return suggestion_ids[:num_suggestions], justification, None
+            return suggestion_ids[:num_suggestions], justification, None # Kein Fehler
         else:
-            # Fehler: Unerwartetes Format im JSON
+            # Fehler: Unerwartetes Format im JSON. Erstelle detaillierte Fehlermeldung.
             error_details = []
-            if not isinstance(suggestion_ids, list): error_details.append("suggestion_ids ist keine Liste")
-            elif not all(isinstance(i, int) for i in suggestion_ids): error_details.append("suggestion_ids enthält nicht nur Zahlen")
-            if not isinstance(justification, str): error_details.append("justification ist kein Text")
+            if not isinstance(suggestion_ids, list): error_details.append("'suggestion_ids' ist keine Liste")
+            elif not all(isinstance(i, int) for i in suggestion_ids): error_details.append("'suggestion_ids' enthält nicht nur Zahlen")
+            if not isinstance(justification, str): error_details.append("'justification' ist kein Text")
             error_msg_details = "; ".join(error_details) if error_details else "Unbekanntes Formatproblem"
-            print(f"FEHLER: LLM (Vorschlag) gab unerwartetes Format zurück. Details: {error_msg_details}. Antwort:\n{cleaned_response}")
+            # print(f"FEHLER: LLM (Vorschlag) gab unerwartetes Format zurück. Details: {error_msg_details}. Antwort:\n{cleaned_response}")
             return None, None, f"Die KI-Antwort (Vorschlag) hatte nicht das erwartete Format ({error_msg_details})."
 
     except json.JSONDecodeError:
-        print(f"FEHLER: LLM (Vorschlag) gab kein gültiges JSON zurück. Antwort:\n{cleaned_response}")
-        return None, None, "Die Antwort der KI (Vorschlag) konnte nicht verarbeitet werden."
+        # Fehler, wenn die Antwort kein gültiges JSON ist.
+        # print(f"FEHLER: LLM (Vorschlag) gab kein gültiges JSON zurück. Antwort:\n{cleaned_response}")
+        return None, None, "Die Antwort der KI (Vorschlag) konnte nicht verarbeitet werden (ungültiges JSON)."
     except Exception as e:
-        print(f"FEHLER: Unerwarteter Fehler bei LLM (Vorschlag) Kommunikation: {e}")
-        traceback.print_exc()
+        # Fange andere Fehler ab (API-Fehler etc.).
+        # print(f"FEHLER: Unerwarteter Fehler bei LLM (Vorschlag) Kommunikation: {e}")
+        # traceback.print_exc()
         return None, None, f"Ein Fehler ist bei der Kommunikation mit der KI (Vorschlag) aufgetreten: {type(e).__name__}"
 
 def update_llm_state(**kwargs: Any) -> None:
     """
-    Aktualisiert LLM-bezogene Variablen im Streamlit Session State sicher.
+    Aktualisiert Variablen im Streamlit Session State, die mit dem LLM zu tun haben.
 
-    Nimmt Schlüsselwortargumente entgegen und aktualisiert die entsprechenden
-    Session-State-Variablen, deren Schlüssel in `config.py` definiert sind.
+    Diese Hilfsfunktion dient dazu, den Code in `app.py` sauberer zu halten.
+    Sie nimmt die Ergebnisse der LLM-Aufrufe (Filter, Vorschläge, Begründung)
+    entgegen und speichert sie sicher im Session State unter den in `config.py`
+    definierten Schlüsseln.
 
-    Args:
-        **kwargs: Akzeptiert die folgenden optionalen Schlüsselwortargumente:
-            filters (Optional[Dict]): Das extrahierte Filter-Dictionary.
-                Aktualisiert `st.session_state[config.STATE_LLM_FILTERS]`.
-            suggestion_ids (Optional[List[int]]): Liste der vorgeschlagenen Aktivitäts-IDs.
-                Aktualisiert `st.session_state[config.STATE_LLM_SUGGESTION_IDS]`.
-            justification (Optional[str]): Die textuelle Begründung des LLM.
-                Aktualisiert `st.session_state[config.STATE_LLM_JUSTIFICATION]`.
-            show_results (bool): Flag, ob die LLM-Ergebnisse angezeigt werden sollen.
-                Aktualisiert `st.session_state[config.STATE_SHOW_LLM_RESULTS]`.
-            query (Optional[str]): Die zuletzt übermittelte Nutzeranfrage.
-                Aktualisiert `st.session_state[config.STATE_NLP_QUERY_SUBMITTED]`.
-            reset_suggestions (bool): Wenn True, werden suggestion_ids und
-                justification zusätzlich auf None gesetzt. Default: False.
+    Mögliche Argumente (übergeben als Schlüsselwortargumente, z.B. filters=mein_filter_dict):
+        filters (Optional[Dict]): Das extrahierte Filter-Dictionary.
+        suggestion_ids (Optional[List[int]]): Liste der vorgeschlagenen IDs.
+        justification (Optional[str]): Die textuelle Begründung.
+        show_results (bool): Flag, ob die LLM-Ergebnisse angezeigt werden sollen.
+        query (Optional[str]): Die zuletzt übermittelte Nutzeranfrage.
+        reset_suggestions (bool): Wenn True, werden Vorschläge/Begründung zusätzlich
+                                  explizit auf None gesetzt (nützlich bei neuer Anfrage).
     """
     # Mapping von Funktionsargument-Namen zu Session State Keys aus config.py
     allowed_keys_map = {
@@ -298,17 +294,15 @@ def update_llm_state(**kwargs: Any) -> None:
         'query': config.STATE_NLP_QUERY_SUBMITTED
     }
 
-    # Hole den Wert für reset_suggestions sicherheitshalber
+    # Verarbeite 'reset_suggestions' zuerst
     reset_suggestions = kwargs.get('reset_suggestions', False)
-
-    # Iteriere durch die erwarteten Schlüssel und aktualisiere den State, wenn übergeben
-    for key, state_key in allowed_keys_map.items():
-        if key in kwargs:
-            st.session_state[state_key] = kwargs[key]
-            # print(f"DEBUG: Session State '{state_key}' aktualisiert.") # Zum Debuggen
-
-    # Wenn reset_suggestions True ist, setze Vorschläge und Begründung explizit zurück
     if reset_suggestions:
         st.session_state[config.STATE_LLM_SUGGESTION_IDS] = None
         st.session_state[config.STATE_LLM_JUSTIFICATION] = None
         # print(f"DEBUG: Session State '{config.STATE_LLM_SUGGESTION_IDS}' und '{config.STATE_LLM_JUSTIFICATION}' zurückgesetzt.")
+
+    # Iteriere durch die erwarteten Schlüssel und aktualisiere den State, wenn der Schlüssel übergeben wurde.
+    for key, state_key in allowed_keys_map.items():
+        if key in kwargs:
+            st.session_state[state_key] = kwargs[key]
+            # print(f"DEBUG: Session State '{state_key}' aktualisiert mit Wert: {kwargs[key]}")

@@ -87,71 +87,71 @@ def apply_base_filters(
     # print(f"Debug: apply_base_filters - Start mit {len(filtered_df)} Aktivitäten für Datum {selected_date}.")
 
     # --- 1. Datumsfilter ---
+    # Prüfe, ob die Aktivität am `selected_date` verfügbar ist.
     try:
         # Konvertiere das ausgewählte Datum sicher in einen Timestamp für Vergleiche
         selected_datum_ts = pd.Timestamp(selected_date)
 
-        # Prüfe Verfügbarkeit 'Datum_Von' (Startdatum)
+        # Prüfe Verfügbarkeit 'Datum_Von' (Startdatum der Aktivität)
         if COL_DATUM_VON in filtered_df.columns:
-            # Konvertiere Spalte sicher zu Timestamps, ungültige Einträge werden NaT
+            # Konvertiere Spalte sicher zu Timestamps, ungültige Einträge werden NaT (Not a Time)
             datum_von_ts = pd.to_datetime(filtered_df[COL_DATUM_VON], errors='coerce')
-            # Behalte Zeilen, wenn 'Datum_Von' leer ist ODER <= selected_datum_ts
+            # Behalte Zeilen, wenn 'Datum_Von' leer ist ODER das Startdatum vor/am ausgewählten Datum liegt.
             mask_von = datum_von_ts.isna() | (datum_von_ts <= selected_datum_ts)
             filtered_df = filtered_df[mask_von]
 
-        # Prüfe Verfügbarkeit 'Datum_Bis' (Enddatum)
+        # Prüfe Verfügbarkeit 'Datum_Bis' (Enddatum der Aktivität)
         if COL_DATUM_BIS in filtered_df.columns:
             # Konvertiere Spalte sicher zu Timestamps, ungültige Einträge werden NaT
             datum_bis_ts = pd.to_datetime(filtered_df[COL_DATUM_BIS], errors='coerce')
-            # Behalte Zeilen, wenn 'Datum_Bis' leer ist ODER >= selected_datum_ts
+            # Behalte Zeilen, wenn 'Datum_Bis' leer ist ODER das Enddatum am/nach dem ausgewählten Datum liegt.
             mask_bis = datum_bis_ts.isna() | (datum_bis_ts >= selected_datum_ts)
             filtered_df = filtered_df[mask_bis]
 
         # print(f"Debug: apply_base_filters - Nach Datumsfilter: {len(filtered_df)} Aktivitäten.")
-        if filtered_df.empty: return filtered_df.reset_index(drop=True) # Frühzeitiger Ausstieg
+        if filtered_df.empty: return filtered_df.reset_index(drop=True) # Frühzeitiger Ausstieg, wenn keine Aktivität am Datum verfügbar
 
     except Exception as e:
         st.warning(f"Fehler beim Anwenden des Datumsfilters: {e}")
-        # Im Fehlerfall: Fahre mit den bis dahin gefilterten Daten fort.
-        # Alternative wäre: return pd.DataFrame(columns=df.columns)
+        # Im Fehlerfall: Fahre mit den bis dahin gefilterten Daten fort oder gib leeren DF zurück.
 
     # --- 2. Aktivitätsart ---
+    # Filtert nach der ausgewählten Art, wenn nicht "Alle" gewählt wurde.
     if activity_type_filter != "Alle" and COL_ART in filtered_df.columns:
         filtered_df = filtered_df[filtered_df[COL_ART] == activity_type_filter]
         # print(f"Debug: apply_base_filters - Nach Art '{activity_type_filter}': {len(filtered_df)} Aktivitäten.")
         if filtered_df.empty: return filtered_df.reset_index(drop=True)
 
     # --- 3. Personenanzahl ---
+    # Filtert basierend auf der gewünschten Gruppengröße.
     if people_filter != "Alle" and COL_PERSONEN_MIN in filtered_df.columns and COL_PERSONEN_MAX in filtered_df.columns:
         try:
-            # Fülle fehlende Werte (NaN aus Laden/Konvertierung) sinnvoll auf für Vergleich
-            # Annahme: Fehlendes Min = 1, Fehlendes Max = unendlich (inf)
-            # Konvertiere sicherheitshalber zu float für Vergleich mit float('inf')
+            # Bereite die Personen-Spalten für den Vergleich vor:
+            # Wandle in Zahlen um (falls nicht schon passiert), ersetze leere Werte (NaN)
+            # mit sinnvollen Annahmen (Min=1, Max=unendlich)
             pers_min_col = pd.to_numeric(filtered_df[COL_PERSONEN_MIN], errors='coerce').fillna(1).astype(float)
             pers_max_col = pd.to_numeric(filtered_df[COL_PERSONEN_MAX], errors='coerce').fillna(float('inf')).astype(float)
 
-            # Logik für die verschiedenen Personen-Kategorien
-            if people_filter == "Alleine":
-                # Min muss <= 1 sein, Max muss >= 1 sein
+            # Wende die Filterlogik für die jeweilige Kategorie an:
+            if people_filter == "Alleine": # Personenzahl = 1
+                # Aktivität muss min. 1 Person erlauben und max. 1 oder mehr.
                 filtered_df = filtered_df[(pers_min_col <= 1) & (pers_max_col >= 1)]
-            elif people_filter == "Zu zweit":
-                 # Min muss <= 2 sein, Max muss >= 2 sein
+            elif people_filter == "Zu zweit": # Personenzahl = 2
+                 # Aktivität muss min. 2 oder weniger erlauben und max. 2 oder mehr.
                 filtered_df = filtered_df[(pers_min_col <= 2) & (pers_max_col >= 2)]
-            elif people_filter == "Bis 4 Personen":
-                # Aktivität muss mind. 1 Person erlauben und max. 4 oder mehr Personen
-                # Gleichzeitig muss Min <= 4 sein, um z.B. Aktivitäten nur für >4 auszuschließen
+            elif people_filter == "Bis 4 Personen": # Personenzahl = 1, 2, 3 oder 4
+                # Aktivität muss min. 4 oder weniger erlauben und für mind. 1 Person geeignet sein.
                 filtered_df = filtered_df[(pers_min_col <= 4) & (pers_max_col >= 1)]
-            elif people_filter == "Mehr als 4 Personen":
-                # Aktivität muss mind. 5 Personen oder mehr erlauben (Max >= 5)
+            elif people_filter == "Mehr als 4 Personen": # Personenzahl = 5 oder mehr
+                # Aktivität muss max. 5 oder mehr Personen erlauben.
                 filtered_df = filtered_df[pers_max_col >= 5]
-            # Interpretation der LLM-Kategorien (konsistent mit config.LLM_POSSIBLE_PERSONEN_KAT)
+            # Interpretation der LLM-Kategorien (aus config.py)
             elif people_filter == "Kleingruppe": # Annahme z.B. 2-5 Personen
-                # Aktivität muss für mind. 2 und max. 5 (oder mehr) geeignet sein
+                # Aktivität muss für min. 5 oder weniger geeignet sein und max. 2 oder mehr erlauben.
                 filtered_df = filtered_df[(pers_min_col <= 5) & (pers_max_col >= 2)]
             elif people_filter == "Grossgruppe": # Annahme z.B. 6+ Personen
-                 # Aktivität muss für 6 oder mehr Personen geeignet sein (Max >= 6)
+                 # Aktivität muss max. 6 oder mehr Personen erlauben.
                 filtered_df = filtered_df[pers_max_col >= 6]
-            # Hier könnten weitere Kategorien oder eine Logik für exakte Zahlen implementiert werden
 
             # print(f"Debug: apply_base_filters - Nach Personen '{people_filter}': {len(filtered_df)} Aktivitäten.")
             if filtered_df.empty: return filtered_df.reset_index(drop=True)
@@ -160,22 +160,24 @@ def apply_base_filters(
             # Fahre fort ohne diesen Filter im Fehlerfall
 
     # --- 4. Budget ---
+    # Filtert Aktivitäten, deren Preis unter oder gleich dem maximalen Budget liegt.
     if budget_filter is not None and COL_PREIS in filtered_df.columns:
         try:
-            # Konvertiere Budget sicher in eine Zahl
+            # Wandle Budget sicher in eine Zahl um.
             budget_num = float(budget_filter)
-            # Vergleiche mit Preis_Ca (Fehlende Preise werden als 0 behandelt)
-            # Behalte Zeilen, deren Preis <= budget_num ist
-            filtered_df = filtered_df[filtered_df[COL_PREIS].fillna(0) <= budget_num]
+            # Vergleiche mit der Preis-Spalte (Fehlende Preise werden als 0 behandelt, siehe data_utils).
+            # Behalte nur Zeilen, deren Preis <= budget_num ist.
+            filtered_df = filtered_df[filtered_df[COL_PREIS] <= budget_num]
             # print(f"Debug: apply_base_filters - Nach Budget '<={budget_num}': {len(filtered_df)} Aktivitäten.")
         except (ValueError, TypeError):
-            # Wenn Budget keine Zahl ist, ignoriere den Filter und gib Warnung aus
+            # Wenn Budget keine gültige Zahl ist, ignoriere den Filter.
             st.warning(f"Ungültiger Budgetwert '{budget_filter}'. Budgetfilter ignoriert.")
         except Exception as e:
             st.warning(f"Fehler beim Anwenden des Budgetfilters: {e}")
             # Fahre fort ohne diesen Filter im Fehlerfall
 
-    # Index zurücksetzen für saubere weitere Verarbeitung und Rückgabe
+    # Index zurücksetzen für saubere weitere Verarbeitung und Rückgabe.
+    # drop=True verhindert, dass der alte Index als neue Spalte hinzugefügt wird.
     return filtered_df.reset_index(drop=True)
 
 
@@ -183,181 +185,165 @@ def apply_weather_filter(
     base_filtered_df: pd.DataFrame,
     original_df: pd.DataFrame,
     selected_date: Optional[datetime.date | pd.Timestamp],
-    consider_weather: bool,
+    consider_weather: bool, # Kommt von der Checkbox in der Sidebar
     api_key: Optional[str],
     api_configured: bool
     ) -> Tuple[pd.DataFrame, Dict[int, Dict[str, Any]], pd.DataFrame]:
     """
-    Ruft Wetterdaten ab, reichert den DataFrame an und filtert optional nach Wetter.
+    Reichert Aktivitäten mit Wetterinfos an und filtert optional danach.
 
-    Diese Funktion nimmt den bereits basis-gefilterten DataFrame (`base_filtered_df`),
-    ruft für jede Aktivität mit Koordinaten die Wettervorhersage für den `selected_date`
-    ab (via `weather_utils`), bewertet die Wetterlage und fügt Wetterinformationen
-    (`weather_note`, `location_temp`, etc.) als neue Spalten hinzu.
-    Wenn `consider_weather` True ist, filtert sie den DataFrame zusätzlich basierend
-    auf der Wetterpräferenz der Aktivität (`COL_WETTER_PREF`) und der Vorhersage.
-    Requirement 2: Nutzt indirekt die Wetter-API über weather_utils.
+    Diese Funktion nimmt die bereits nach Basis-Kriterien gefilterten Aktivitäten,
+    holt für jede (falls Koordinaten vorhanden) die Wettervorhersage vom `selected_date`
+    über `weather_utils.py`, bewertet die Wetterlage ("Good", "Bad", "Uncertain")
+    und fügt Wetterinformationen (Temperatur, Symbol, Beschreibung, Hinweis) hinzu.
+
+    Wenn `consider_weather` True ist (Checkbox in Sidebar aktiviert), werden
+    Aktivitäten aussortiert, deren Wetterpräferenz (z.B. "Nur Sonne") nicht zur
+    Vorhersage passt.
 
     Args:
-        base_filtered_df (pd.DataFrame): Der DataFrame nach der Basisfilterung.
-        original_df (pd.DataFrame): Der ursprüngliche, ungefilterte DataFrame.
-            Wird benötigt, um Wetterdaten dem ursprünglichen Index zuzuordnen.
-            Muss `COL_ID` enthalten.
-        selected_date (Optional[datetime.date | pd.Timestamp]): Das Datum für die
-            Wettervorhersage. Wenn None, wird Wetterprüfung übersprungen.
-        consider_weather (bool): Steuert, ob der Wetterfilter angewendet wird.
+        base_filtered_df (pd.DataFrame): DataFrame nach der Basisfilterung.
+        original_df (pd.DataFrame): Der ursprüngliche, ungefilterte DataFrame (wichtig für ID-Mapping).
+        selected_date (Optional[datetime.date | pd.Timestamp]): Das Datum für die Wettervorhersage.
+        consider_weather (bool): Steuert, ob nach Wetterpräferenz gefiltert wird.
         api_key (Optional[str]): Der OpenWeatherMap API Key.
         api_configured (bool): Flag, ob der API Key vorhanden und gültig ist.
 
     Returns:
         Tuple[pd.DataFrame, Dict[int, Dict[str, Any]], pd.DataFrame]:
-        1.  `final_filtered_df` (pd.DataFrame): Der DataFrame, der alle Filter
-            (Basis + optional Wetter) durchlaufen hat. Für die Anzeige der
-            gefilterten Liste. Index ist zurückgesetzt.
-        2.  `weather_data_map` (Dict): Ein Dictionary, das Wetterdetails
-            ({note, temp, icon, desc}) auf den Index der Aktivität im
-            *original_df* mappt (via `COL_ID`). Nützlich für LLM-Kontext.
-        3.  `df_with_weather_columns` (pd.DataFrame): Eine Kopie des
-            `base_filtered_df`, angereichert um die Wetterspalten (aber *nicht*
-            nach Wetter gefiltert). Dient als Kandidatenliste mit Wetterinfos
-            für das LLM. Index ist zurückgesetzt.
+        1.  `final_filtered_df`: DataFrame mit Aktivitäten, die alle Filterkriterien erfüllen
+            (Basis + optional Wetter). Wird für die Hauptliste angezeigt.
+        2.  `weather_data_map`: Ein Dictionary, das Wetterdetails (Hinweis, Temp, etc.)
+            der Aktivitäts-ID im *original_df* zuordnet. Nützlich für LLM-Kontext.
+        3.  `df_with_weather_columns`: Eine Kopie von `base_filtered_df`, angereichert
+            um die Wetterspalten, aber *nicht* notwendigerweise nach Wetter gefiltert.
+            Dient als Kandidatenliste mit Wetterinfos für das LLM.
     """
-    # Kopiere den basis-gefilterten DF, um ihn mit Wetterdaten anzureichern
+    # Kopiere den basis-gefilterten DF, um ihn mit Wetterdaten anzureichern, ohne das Original zu ändern.
     df_with_weather = base_filtered_df.copy()
 
-    # Initialisiere Wetterspalten sicherheitshalber mit None
+    # Initialisiere Wetterspalten mit leeren Werten, falls sie nicht schon existieren.
     weather_columns = ['weather_note', 'location_temp', 'location_icon', 'location_desc']
     for col in weather_columns:
         if col not in df_with_weather.columns:
-            df_with_weather[col] = None # Oder pd.NA
+            df_with_weather[col] = None # Oder pd.NA für Pandas >= 1.0
 
-    # Initialisiere leere Ergebnisse
-    weather_data_map: Dict[int, Dict[str, Any]] = {} # Map: original_index -> {wetterdetails}
-    indices_pass_weather_filter: list[int] = [] # Indizes im df_with_weather, die Filter bestehen
+    # Initialisiere leere Ergebnis-Container
+    weather_data_map: Dict[int, Dict[str, Any]] = {} # Map: Aktivitäts-ID -> {Wetterdetails}
+    indices_pass_weather_filter: list[int] = [] # Sammelt Indizes der Aktivitäten, die den Wetterfilter (wenn aktiv) bestehen
 
-    # Überspringe Wetterabruf, wenn nicht sinnvoll/möglich
+    # Wetterprüfung überspringen, wenn nicht sinnvoll oder nicht möglich
     if not api_configured or df_with_weather.empty or selected_date is None or api_key is None:
-        # print("Debug: apply_weather_filter - Übersprungen (Keine API, Daten, Datum oder Key).")
+        # Gib den (unveränderten) DF mit leeren Wetterspalten zurück
         df_reset = df_with_weather.reset_index(drop=True)
-        # Gib den (unveränderten) DF mit leeren Wetterspalten zurück, leere Map, und denselben DF als 'final'
         return df_reset.copy(), weather_data_map, df_reset.copy()
 
-    # --- Wetterdaten sammeln und bewerten ---
-    # print(f"Debug: apply_weather_filter - Starte Wetterabruf für {len(df_with_weather)} Aktivitäten am {selected_date}...")
-
-    # Erstelle Mapping von Aktivitäts-ID zu ursprünglichem Index für weather_data_map
-    # Wird benötigt, um Wetterinfos dem richtigen Eintrag im originalen DF zuzuordnen
+    # --- Wetterdaten für jede Aktivität sammeln und bewerten ---
+    # Erstelle ein Mapping von Aktivitäts-ID zu ihrem Index im *originalen* DataFrame.
+    # Dies wird benötigt, um die Wetterdaten korrekt der ursprünglichen Aktivität zuzuordnen (für weather_data_map).
     id_to_original_index_map: Dict[Any, int] = {}
     if not original_df.empty and COL_ID in original_df.columns:
         try:
-            # Stelle sicher, dass IDs im Original-DF für die Map eindeutig sind
-            original_df_no_duplicates = original_df.drop_duplicates(subset=[COL_ID])
+            # Stelle sicher, dass IDs im Original-DF für die Map eindeutig sind (falls Duplikate existieren)
+            original_df_no_duplicates = original_df.drop_duplicates(subset=[COL_ID], keep='first')
             id_to_original_index_map = pd.Series(
-                original_df_no_duplicates.index,
-                index=original_df_no_duplicates[COL_ID]
+                original_df_no_duplicates.index, # Der ursprüngliche Index
+                index=original_df_no_duplicates[COL_ID] # Die ID als Schlüssel
             ).to_dict()
         except Exception as e:
-            print(f"WARNUNG: Fehler beim Erstellen der ID->Index Map: {e}. weather_data_map wird unvollständig sein.")
+            print(f"WARNUNG: Fehler beim Erstellen der ID->Index Map für Wetterdaten: {e}. weather_data_map wird evtl. unvollständig.")
             id_to_original_index_map = {} # Leere Map im Fehlerfall
-    else:
-        print("WARNUNG: Original DataFrame für ID-Index-Map fehlt oder hat keine ID-Spalte. weather_data_map kann nicht befüllt werden.")
 
-    # Iteriere über die Indizes des *aktuellen* DataFrames (df_with_weather)
-    for index in df_with_weather.index:
-        row = df_with_weather.loc[index]
-        activity_id = row.get(COL_ID) # ID der aktuellen Aktivität holen
+    # Iteriere über jede Aktivität im *aktuell gefilterten* DataFrame (df_with_weather)
+    for index, row in df_with_weather.iterrows():
+        activity_id = row.get(COL_ID) # ID der aktuellen Aktivität
         lat = row.get(COL_LAT)
         lon = row.get(COL_LON)
-        # Wetterpräferenz der Aktivität (Default 'Egal')
+        # Wetterpräferenz der Aktivität holen (Standard: 'Egal')
         activity_weather_pref = str(row.get(COL_WETTER_PREF, 'Egal'))
         if pd.isna(activity_weather_pref): activity_weather_pref = 'Egal'
 
-        # Initialisiere Variablen für diese Iteration
+        # Initialisiere Ergebnisvariablen für diese Aktivität
         note, loc_temp, loc_icon, loc_desc = None, None, None, None
-        keep_based_on_weather = True # Standard: Behalten, außer Filter schlägt fehl
+        keep_activity = True # Standard: Aktivität behalten, es sei denn, der Wetterfilter greift
 
-        # --- Fall 1: Keine Koordinaten -> Kein Wetterabruf möglich ---
+        # Fall 1: Keine Koordinaten -> Kein Wetterabruf möglich
         if pd.isna(lat) or pd.isna(lon):
-            note = "❓ Standortkoordinaten fehlen."
-            # Aktivität wird immer behalten, da Wetter nicht geprüft werden kann
-            keep_based_on_weather = True
-        # --- Fall 2: Koordinaten vorhanden -> Wetter abrufen und bewerten ---
+            note = "❓ Standortkoordinaten fehlen für Wetterprüfung."
+            # Aktivität wird immer behalten, da Wetter nicht geprüft werden kann.
+            keep_activity = True
+        # Fall 2: Koordinaten vorhanden -> Wetter abrufen und bewerten
         else:
+            # Rufe Wettervorhersage für den Standort und das Datum ab (Funktion aus weather_utils)
             activity_forecast = get_weather_forecast_for_day(api_key, lat, lon, selected_date)
-            weather_status = check_activity_weather_status(activity_forecast) # "Good", "Bad", "Uncertain", "Unknown"
+            # Bewerte die Wetterlage basierend auf der Vorhersage (Funktion aus weather_utils)
+            weather_status = check_activity_weather_status(activity_forecast) # Ergebnis: "Good", "Bad", "Uncertain", "Unknown"
 
-            # Extrahiere repräsentative Wetterdetails für Anzeige/Map (Mittag/erste Vorhersage)
+            # Extrahiere repräsentative Wetterdetails für die Anzeige (Temperatur, Symbol, Beschreibung - meist Mittagswert)
             if activity_forecast:
                 try:
+                    # (Logik zur Auswahl des repräsentativen Eintrags - hier vereinfacht dargestellt)
                     valid_forecasts = [f for f in activity_forecast if isinstance(f.get('datetime'), datetime.datetime)]
                     if valid_forecasts:
-                        loc_representative_forecast = next((f for f in valid_forecasts if f['datetime'].hour >= 12), valid_forecasts[0])
-                        loc_temp = loc_representative_forecast.get('temp')
-                        loc_icon = loc_representative_forecast.get('icon')
-                        loc_desc = str(loc_representative_forecast.get('description', '')).capitalize()
-                except Exception as e:
-                    # print(f"Debug: Fehler bei Auswahl repr. Wettervorhersage für Index {index} ({lat},{lon}): {e}")
-                    pass # Details bleiben None
+                        # Wähle erste Vorhersage ab 12 Uhr, sonst die erste überhaupt
+                        rep_forecast = next((f for f in valid_forecasts if f['datetime'].hour >= 12), valid_forecasts[0])
+                        loc_temp = rep_forecast.get('temp')
+                        loc_icon = rep_forecast.get('icon')
+                        loc_desc = str(rep_forecast.get('description', '')).capitalize()
+                except Exception:
+                    pass # Details bleiben None, wenn etwas schiefgeht
 
-            # --- Entscheidung treffen, ob Aktivität behalten wird (wenn Wetterfilter aktiv ist) ---
-            if activity_weather_pref == 'Egal':
-                keep_based_on_weather = True # Wetter ist egal
-            elif activity_weather_pref == 'Nur Sonne':
-                if weather_status == "Good":
-                    keep_based_on_weather = True
-                elif weather_status == "Uncertain":
-                    keep_based_on_weather = True # Unsicher ist ok, aber mit Hinweis
-                    note = "⚠️ Wetter unsicher (z.B. bewölkt), Aktivität bevorzugt aber Sonne."
-                elif weather_status == "Unknown":
-                     keep_based_on_weather = True # Wenn nicht prüfbar, vorsichtshalber behalten
-                     note = "❓ Wetterdaten nicht verfügbar/verarbeitbar."
-                else: # "Bad" weather
-                    keep_based_on_weather = False # Nicht behalten bei schlechtem Wetter
-            elif activity_weather_pref == 'Nur Regen':
-                 # Behalten nur wenn Wetter als 'Bad' klassifiziert wurde (Regen, Schnee, Gewitter etc.)
-                 if weather_status == "Bad":
-                     keep_based_on_weather = True
-                 elif weather_status == "Unknown":
-                     keep_based_on_weather = True # Wenn nicht prüfbar, vorsichtshalber behalten
-                     note = "❓ Wetterdaten nicht verfügbar/verarbeitbar."
-                 else: # "Good" or "Uncertain"
-                     keep_based_on_weather = False
-                     note = "ℹ️ Aktivität bevorzugt Regen, aber Wetter ist nicht 'Bad'."
-            else: # Unbekannte Präferenz -> Sicherheitshalber behalten
-                keep_based_on_weather = True
-                # print(f"Debug: Unbekannte Wetterpräferenz '{activity_weather_pref}' bei Index {index}.")
-                note = f"❓ Unbekannte Wetterpräferenz: {activity_weather_pref}"
+            # --- Entscheidung: Aktivität behalten oder rausfiltern? (Nur wenn `consider_weather` aktiv ist) ---
+            # Diese Logik wird nur angewendet, wenn die Checkbox "Nach Wetter filtern" aktiviert ist.
+            if consider_weather:
+                if activity_weather_pref == 'Egal':
+                    keep_activity = True # Wetter ist egal, immer behalten.
+                elif activity_weather_pref == 'Nur Sonne':
+                    # Behalten bei "Good" oder "Uncertain" Wetter, aber Hinweis bei "Uncertain". Nicht behalten bei "Bad".
+                    if weather_status == "Good": keep_activity = True
+                    elif weather_status == "Uncertain":
+                        keep_activity = True; note = "⚠️ Wetter unsicher (z.B. bewölkt), Aktivität bevorzugt aber Sonne."
+                    elif weather_status == "Unknown":
+                        keep_activity = True; note = "❓ Wetterdaten nicht verfügbar/prüfbar."
+                    else: # "Bad" weather
+                        keep_activity = False; note = "❌ Passt nicht: Schlechtes Wetter vorhergesagt, aber 'Nur Sonne' gewünscht."
+                elif activity_weather_pref == 'Nur Regen':
+                    # Behalten nur bei "Bad" Wetter (Regen, Schnee, Gewitter...). Nicht behalten bei "Good" oder "Uncertain".
+                    if weather_status == "Bad": keep_activity = True
+                    elif weather_status == "Unknown":
+                        keep_activity = True; note = "❓ Wetterdaten nicht verfügbar/prüfbar."
+                    else: # "Good" or "Uncertain"
+                        keep_activity = False; note = "❌ Passt nicht: Gutes/Unsicheres Wetter, aber 'Nur Regen' gewünscht."
+                else: # Unbekannte Präferenz
+                    keep_activity = True; note = f"❓ Unbekannte Wetterpräferenz: {activity_weather_pref}"
+            # else: Wenn consider_weather False ist, bleibt keep_activity = True (Standard)
 
         # --- Ergebnisse für diese Aktivität speichern ---
-        # Wetterdetails IMMER im DataFrame speichern (auch wenn nicht gefiltert wird)
+        # Füge die gesammelten Wetterinfos zum DataFrame hinzu (immer, auch wenn nicht gefiltert wird).
         df_with_weather.loc[index, 'weather_note'] = note
         df_with_weather.loc[index, 'location_temp'] = loc_temp
         df_with_weather.loc[index, 'location_icon'] = loc_icon
         df_with_weather.loc[index, 'location_desc'] = loc_desc
 
-        # Füge Index zur Liste der zu behaltenden hinzu, wenn Wetter passt
-        if keep_based_on_weather:
+        # Wenn die Aktivität (nach optionaler Wetterfilterung) behalten werden soll, merke dir ihren Index.
+        if keep_activity:
             indices_pass_weather_filter.append(index)
 
-        # Wetterdaten auch für die Map (gemappt auf originalen Index via ID) speichern
+        # Speichere Wetterdaten auch für die Map (gemappt auf originalen Index via ID).
         if activity_id is not None:
             original_index = id_to_original_index_map.get(activity_id)
             if original_index is not None:
-                weather_data_map[original_index] = {'note': note, 'temp': loc_temp, 'icon': loc_icon, 'desc': loc_desc}
-            # else: ID nicht in Map gefunden (Warnung wurde oben ausgegeben)
+                weather_data_map[original_index] = {
+                    'note': note, 'temp': loc_temp, 'icon': loc_icon, 'desc': loc_desc
+                 }
 
-    # print(f"Debug: apply_weather_filter - Wetterabruf beendet. {len(indices_pass_weather_filter)} Aktivitäten bestehen potenziellen Wetterfilter.")
-
-    # --- Optionales Filtern basierend auf Checkbox ---
+    # --- Finalen DataFrame basierend auf Wetterfilterung erstellen ---
     if consider_weather:
-        # Filtere den DataFrame `df_with_weather` basierend auf den gesammelten Indizes
-        # .loc ist sicher, auch wenn indices_pass_weather_filter leer ist
-        final_filtered_df = df_with_weather.loc[df_with_weather.index.intersection(indices_pass_weather_filter)].copy()
-        # print(f"Debug: apply_weather_filter - Nach Wetterfilterung (consider=True): {len(final_filtered_df)} Aktivitäten.")
+        # Wenn gefiltert wurde: Wähle nur die Zeilen aus, deren Indizes in `indices_pass_weather_filter` sind.
+        final_filtered_df = df_with_weather.loc[indices_pass_weather_filter].copy()
     else:
-        # Wenn nicht gefiltert wird, ist das Ergebnis der DataFrame mit Wetterspalten
+        # Wenn nicht gefiltert wurde: Der finale DF ist derselbe wie der mit Wetterspalten angereicherte.
         final_filtered_df = df_with_weather.copy()
-        # print("Debug: apply_weather_filter - Wetterfilter nicht angewendet (consider=False).")
 
-    # Gib die Ergebnisse zurück (Indizes zurücksetzen für Konsistenz)
+    # Gib die Ergebnisse zurück (Indizes zurücksetzen für Konsistenz).
     return final_filtered_df.reset_index(drop=True), weather_data_map, df_with_weather.reset_index(drop=True)

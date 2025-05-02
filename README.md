@@ -23,18 +23,18 @@ Die Anwendung bietet:
 * **Dynamische Filter:** Bietet verschiedene Filteroptionen zur Eingrenzung der Suche. (Req. 4)
 * **Visualisierungen:** Stellt Wetterdaten und Nutzerpräferenzen grafisch dar (Streamlit Charts, Plotly). (Req. 3)
 
-## Wichtiger Hinweis: Entwicklung mit KI-Unterstützung (Gemini)
+## Wichtiger Hinweis: Entwicklung als Mensch-KI-Kollaboration
 
-Diese Anwendung wurde im Rahmen des Kurses "Introduction to Computer Science" an der Universität St.Gallen entwickelt. Ein wesentlicher Bestandteil des Entwicklungsprozesses war die **kollaborative Zusammenarbeit mit dem Large Language Model Gemini (Google)**.
+Diese Anwendung wurde im Rahmen des Kurses "Grundlagen und Methoden der Informatik für Wirtschaftswissenschaften" an der Universität St.Gallen in einer **engen kollaborativen Partnerschaft zwischen dem menschlichen Entwicklerteam und dem Large Language Model Gemini (Google)** entwickelt. Gemini diente dabei als Werkzeug und unterstützender Partner während des gesamten Entwicklungsprozesses.
 
-Gemini wurde als aktiver Partner in folgenden Bereichen eingesetzt:
-* **Code-Generierung:** Erstellung von Code-Snippets und Implementierung von Funktionen basierend auf Beschreibungen.
-* **Debugging:** Identifizierung und Korrektur von Fehlern im Code (Syntax- und Logikfehler).
-* **Refactoring & Strukturierung:** Vorschläge zur Verbesserung der Code-Struktur, Lesbarkeit und Modularisierung.
-* **Dokumentation:** Formulierung von Docstrings, Kommentaren und wesentlichen Teilen dieses READMEs.
-* **Konzeptionelle Unterstützung:** Diskussion von Lösungsansätzen und Algorithmen (z.B. für das Empfehlungssystem, Layout-Gestaltung).
+Die Unterstützung durch Gemini umfasste insbesondere folgende Bereiche:
+* **Code-Generierung:** Erstellung von Code-Bausteinen und Vorschläge für Funktionsimplementierungen basierend auf definierten Anforderungen.
+* **Debugging:** Unterstützung bei der Identifizierung und Behebung von Fehlern im Code.
+* **Refactoring & Strukturierung:** Ideen und Vorschläge zur Verbesserung der Code-Organisation, Lesbarkeit und Modularität.
+* **Dokumentation:** Hilfe bei der Formulierung von Docstrings, Kommentaren und Teilen dieses READMEs.
+* **Konzeptionelle Unterstützung:** Diskussion von alternativen Lösungsansätzen, Algorithmen und Design-Entscheidungen.
 
-Die Entwicklung war ein iterativer Prozess, bei dem Anforderungen und Ideen mit Gemini diskutiert und der von Gemini generierte Code überprüft, angepasst und integriert wurde. **Gemäss den Richtlinien der Universität St.Gallen zum Umgang mit generativer KI wird die massgebliche Unterstützung durch Gemini hiermit transparent gemacht.**
+Der Entwicklungsprozess war iterativ: Anforderungen und Ideen wurden durch das Entwicklerteam formuliert, mit Gemini diskutiert, und von Gemini vorgeschlagener Code wurde stets **kritisch überprüft, angepasst, getestet und durch das Entwicklerteam bewusst integriert**. Gemäss den Richtlinien der Universität St.Gallen zum Umgang mit generativer KI wird diese signifikante Unterstützung durch Gemini hiermit vollständig transparent gemacht. Die Verantwortung für den finalen Code und die Anwendung liegt beim Entwicklerteam.
 
 ## Einrichtung und Ausführung
 
