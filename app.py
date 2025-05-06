@@ -840,3 +840,4 @@ if not list_content_shown:
          st.info("Keine Aktivitäten für die gewählten Filter und das Datum gefunden.")
 
 # print("--- App-Durchlauf beendet ---") # Debug
+
