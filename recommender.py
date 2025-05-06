@@ -18,8 +18,7 @@ Hauptaufgaben hier drin:
 
 import pandas as pd
 import numpy as np
-# import scipy.sparse # Wahrscheinlich nicht direkt benötigt
-import random # Für zufällige "Überraschungs"-Vorschläge
+import random 
 from collections import Counter # Zum Zählen von Elementen (z.B. Zielgruppen)
 from typing import Tuple, Optional, List, Dict, Any, Set # Nur technische Typ-Hinweise für Entwickler
 
@@ -214,90 +213,119 @@ def get_profile_recommendations(
     user_profile: Optional[np.ndarray],
     features_matrix: Optional[np.ndarray],
     df: pd.DataFrame,
-    rated_ids: Set[int], # IDs aller Aktivitäten, die der Nutzer schon bewertet hat (Like ODER Dislike)
-    n: int = 5, # Wie viele Empfehlungen sollen maximal generiert werden?
-    exploration_rate: float = 0.15 # Chance (hier 15%), einen zufälligen Vorschlag einzumischen
+    rated_ids: Set[int],
+    n: int = 5,
+    num_exploration_suggestions: int = 0
     ) -> List[int]:
     """
-    Findet Aktivitäten, die dem Geschmacksprofil des Nutzers ähneln.
-
-    Vergleicht den "Geschmacks-Fingerabdruck" des Nutzers mit dem "digitalen
-    Fingerabdruck" jeder einzelnen Aktivität. Die Aktivitäten, deren Fingerabdruck
-    dem Geschmacksprofil am ähnlichsten ist, werden als Empfehlung vorgeschlagen.
-    Bereits bewertete Aktivitäten werden dabei übersprungen.
-
-    Manchmal wird auch ein zufälliger Vorschlag eingemischt, damit der Nutzer
-    auch mal etwas ganz Neues entdecken kann (das nennt man "Exploration").
+    Findet Aktivitäten, die dem Geschmacksprofil des Nutzers ähneln,
+    mit einer Option für gesteuerte Exploration zur Erhöhung der Vielfalt.
 
     Args:
         user_profile (Optional[np.ndarray]): Der "Geschmacks-Fingerabdruck" des Nutzers.
         features_matrix (Optional[np.ndarray]): Die "digitalen Fingerabdrücke" aller Aktivitäten.
-        df (pd.DataFrame): Die ursprüngliche Aktivitätstabelle.
-        rated_ids (Set[int]): Die IDs der bereits bewerteten Aktivitäten.
-        n (int): Maximale Anzahl an Empfehlungen.
-        exploration_rate (float): Die Wahrscheinlichkeit für einen "Überraschungs"-Vorschlag.
+        df (pd.DataFrame): Die ursprüngliche Aktivitätstabelle mit allen Aktivitätsdaten.
+        rated_ids (Set[int]): Die IDs der bereits vom Nutzer bewerteten Aktivitäten.
+        n (int): Die Gesamtzahl der zu generierenden Empfehlungen.
+        num_exploration_suggestions (int): Die Anzahl der Empfehlungen (von n),
+                                           die primär auf Exploration (Zufall, Diversität)
+                                           statt auf direkter Profilähnlichkeit basieren sollen.
 
     Returns:
-        List[int]: Eine Liste mit den IDs der empfohlenen Aktivitäten. Die Reihenfolge ist
-                   am Ende zufällig. Kann leer sein, wenn nichts Passendes gefunden wird.
+        List[int]: Eine Liste mit den IDs der empfohlenen Aktivitäten,
+                   deren Länge maximal n ist. Kann leer sein, wenn keine
+                   passenden Aktivitäten gefunden werden.
     """
-    if user_profile is None or features_matrix is None or features_matrix.shape[1] == 0 or df.empty:
-        return [] # Keine Empfehlungen möglich
+    # Überprüfung der Eingabeparameter
+    if user_profile is None or features_matrix is None or features_matrix.shape[0] == 0 or features_matrix.shape[1] == 0 or df.empty:
+        # print("Debug (get_profile_recommendations): Ungültige Eingabe (Profil, Matrix oder df leer).") # Debug
+        return []
 
-    # Technische Vorbereitung für den Ähnlichkeitsvergleich
+    # Sicherstellen, dass das Nutzerprofil die korrekte Form für cosine_similarity hat (2D-Array)
     if user_profile.ndim == 1:
         user_profile = user_profile.reshape(1, -1)
 
+    # Berechnung der Ähnlichkeits-Scores zwischen Nutzerprofil und allen Aktivitäten
     try:
-        # Berechne für jede Aktivität einen Ähnlichkeits-Score (zwischen 0 und 1)
-        # zum Geschmacksprofil des Nutzers. Ein Score nahe 1 bedeutet sehr ähnlich.
-        # (Die Methode heisst Kosinus-Ähnlichkeit).
+        # Kosinus-Ähnlichkeit berechnet, wie ähnlich das Profil jeder Aktivität ist.
         profile_similarities = cosine_similarity(user_profile, features_matrix)
-        # Merke dir zu jedem Score, zu welcher Aktivität (Index) er gehört.
+        # Erstelle eine Liste von Tupeln (Index der Aktivität, Ähnlichkeits-Score)
         sim_scores_with_indices = list(enumerate(profile_similarities[0]))
     except Exception as e:
-         print(f"FEHLER (profile_recs): Ähnlichkeitsberechnung fehlgeschlagen: {e}")
+         print(f"FEHLER (get_profile_recommendations): Ähnlichkeitsberechnung fehlgeschlagen: {e}")
          return []
 
-    # Sortiere die Aktivitäten: Die ähnlichsten zuerst.
+    # Sortiere Aktivitäten nach Ähnlichkeit (höchste zuerst)
     sim_scores_with_indices.sort(key=lambda x: x[1], reverse=True)
 
-    # Gehe die sortierte Liste durch und sammle die Top-N Aktivitäten,
-    # die der Nutzer noch nicht bewertet hat.
-    recommended_ids: List[int] = []
+    profile_based_ids: List[int] = []
+    # Zielanzahl für rein profilbasierte Vorschläge
+    num_profile_only_suggestions = n - num_exploration_suggestions
+
+    # Sammle profilbasierte Vorschläge (die ähnlichsten, noch nicht bewerteten Aktivitäten)
     try:
+        # Stelle sicher, dass die ID-Spalte numerisch ist für den Abgleich
+        if COL_ID not in df.columns:
+            print(f"FEHLER (get_profile_recommendations): Spalte '{COL_ID}' nicht im DataFrame.")
+            return []
         df[COL_ID] = pd.to_numeric(df[COL_ID], errors='coerce').fillna(-1).astype(int)
+
         for index, score in sim_scores_with_indices:
-            if len(recommended_ids) >= n: # Genug Empfehlungen gefunden? Stopp!
+            # Stoppe, wenn genug profilbasierte Vorschläge gesammelt wurden
+            if len(profile_based_ids) >= num_profile_only_suggestions:
                 break
-            activity_id = df.iloc[index].get(COL_ID) # ID der Aktivität holen
-            # Ist die ID gültig und wurde sie noch NICHT bewertet?
+            
+            # Hole die ID der Aktivität aus dem DataFrame
+            # .iloc[index] greift auf die Zeile an der Position 'index' zu
+            activity_id = df.iloc[index].get(COL_ID)
+
+            # Füge ID hinzu, wenn sie gültig ist und noch nicht bewertet wurde
             if activity_id is not None and activity_id != -1 and activity_id not in rated_ids:
-                 recommended_ids.append(int(activity_id)) # Dann zur Liste hinzufügen
+                 profile_based_ids.append(int(activity_id))
+    except KeyError:
+        # Falls .iloc[index] aus irgendeinem Grund fehlschlägt (sollte nicht bei korrekten Indizes)
+        print(f"FEHLER (get_profile_recommendations): Indexfehler beim Zugriff auf DataFrame-Zeile.")
+         # Fahre mit den bis dahin gesammelten IDs fort oder gib eine leere Liste zurück
     except Exception as e:
-        print(f"FEHLER (profile_recs): Beim Auswählen der Top-Empfehlungen: {e}")
-        # Gib zurück, was bisher gefunden wurde
-        return recommended_ids
+        print(f"FEHLER (get_profile_recommendations): Beim Auswählen der profilbasierten Empfehlungen: {e}")
+        # Im Fehlerfall könnten hier die bis dahin gesammelten IDs zurückgegeben werden,
+        # aber die Funktion fährt fort, um ggf. explorative Vorschläge hinzuzufügen.
 
-    # --- Exploration: Füge eventuell einen zufälligen Vorschlag hinzu ---
-    if random.random() < exploration_rate and not df.empty: # Mit 15% Wahrscheinlichkeit
-        # Finde alle IDs, die noch nicht bewertet wurden
-        all_ids = df[COL_ID].dropna().unique().tolist()
-        unrated_ids = [id_ for id_ in all_ids if isinstance(id_, (int, float)) and pd.notna(id_) and int(id_) not in rated_ids and int(id_) != -1]
-        valid_unrated_ids_int = [int(id_) for id_ in unrated_ids]
+    # --- Exploration: Füge eine bestimmte Anzahl explorativer Vorschläge hinzu ---
+    exploration_ids: List[int] = []
+    # Berechne, wie viele Slots tatsächlich noch durch Exploration gefüllt werden müssen/können,
+    # um die Gesamtzahl 'n' zu erreichen.
+    actual_exploration_needed = n - len(profile_based_ids)
 
-        if valid_unrated_ids_int:
-            random_id = random.choice(valid_unrated_ids_int) # Wähle eine zufällige ID
-            # Füge sie hinzu/ersetze eine, wenn sie noch nicht drin ist
-            if random_id not in recommended_ids:
-                 if len(recommended_ids) < n:
-                     recommended_ids.insert(0, random_id) # Vorne einfügen
-                 elif len(recommended_ids) == n:
-                     recommended_ids[-1] = random_id # Letzte (unähnlichste) ersetzen
+    if actual_exploration_needed > 0 and not df.empty:
+        # Hole alle eindeutigen, gültigen IDs aus dem DataFrame
+        all_db_ids = df[COL_ID].dropna().unique().tolist()
 
-    # Mische die finale Liste, damit nicht immer die ähnlichste zuerst kommt.
-    random.shuffle(recommended_ids)
-    return recommended_ids
+        # Kandidaten für Exploration:
+        # - Müssen gültige Integer-IDs sein.
+        # - Dürfen nicht bereits vom Nutzer bewertet worden sein.
+        # - Dürfen nicht bereits in den profilbasierten Vorschlägen enthalten sein.
+        candidate_exploration_ids = [
+            int(id_val) for id_val in all_db_ids
+            if isinstance(id_val, (int, float)) and pd.notna(id_val) and int(id_val) != -1
+            and int(id_val) not in rated_ids
+            and int(id_val) not in profile_based_ids # Verhindert Duplikate mit Profil-Vorschlägen
+        ]
+        
+        # Mische die Kandidaten für eine zufällige Auswahl
+        random.shuffle(candidate_exploration_ids)
+        # Wähle die benötigte Anzahl an explorativen IDs aus
+        exploration_ids.extend(candidate_exploration_ids[:actual_exploration_needed])
+
+    # Kombiniere die profilbasierten und die explorativen Vorschläge
+    final_recommendations = profile_based_ids + exploration_ids
+    
+    # Mische die finale Liste, damit die explorativen und profilbasierten Vorschläge
+    # in einer zufälligen Reihenfolge erscheinen (verhindert, dass Exploration immer am Ende ist).
+    random.shuffle(final_recommendations)
+
+    # Stelle sicher, dass nicht mehr als n Empfehlungen zurückgegeben werden.
+    return final_recommendations[:n]
 
 
 # --- Hilfsfunktionen für die Visualisierung ("Was mag ich?") ---

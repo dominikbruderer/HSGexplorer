@@ -17,7 +17,7 @@ import os # Wird verwendet, um Dateinamen aus Pfaden zu extrahieren (für Fehler
 try:
     from config import (
         EXPECTED_COLUMNS, COL_ID, COL_LAT, COL_LON, COL_PREIS,
-        COL_DATUM_VON, COL_DATUM_BIS, COL_PERSONEN_MIN, COL_PERSONEN_MAX,
+        COL_DATUM_VON, COL_DATUM_BIS,
         COL_WETTER_PREF, COL_INDOOR_OUTDOOR
         # Hier könnten bei Bedarf weitere importiert werden, aber die oben genannten
         # werden direkt in dieser Datei für die Bereinigung verwendet.
@@ -112,7 +112,7 @@ def load_data(filepath: str) -> pd.DataFrame:
         # Wandle Spalten, die Zahlen enthalten sollten, in Zahlen um.
         # Wenn ein Eintrag keine Zahl ist (z.B. Text), wird er zu 'NaN' (Not a Number),
         # also einem leeren Zahlenwert.
-        numeric_cols = [COL_PREIS, COL_LAT, COL_LON, COL_PERSONEN_MIN, COL_PERSONEN_MAX, COL_ID]
+        numeric_cols = [COL_PREIS, COL_LAT, COL_LON, COL_ID]
         for col in numeric_cols:
             if col in df_load.columns:
                 df_load[col] = pd.to_numeric(df_load[col], errors='coerce')
@@ -121,10 +121,6 @@ def load_data(filepath: str) -> pd.DataFrame:
         # Schritt 4: Fehlende oder ungültige Werte (NaN/NaT) durch Standardwerte ersetzen
         # Annahme: Fehlender Preis -> kostenlos (0 CHF)
         if COL_PREIS in df_load.columns: df_load[COL_PREIS] = df_load[COL_PREIS].fillna(0)
-        # Annahme: Fehlendes Personen-Minimum -> ab 1 Person
-        if COL_PERSONEN_MIN in df_load.columns: df_load[COL_PERSONEN_MIN] = df_load[COL_PERSONEN_MIN].fillna(1)
-        # Annahme: Fehlendes Personen-Maximum -> keine Obergrenze (unendlich)
-        if COL_PERSONEN_MAX in df_load.columns: df_load[COL_PERSONEN_MAX] = df_load[COL_PERSONEN_MAX].fillna(float('inf'))
         # Annahme: Fehlende Wetterpräferenz -> Wetter egal
         if COL_WETTER_PREF in df_load.columns: df_load[COL_WETTER_PREF] = df_load[COL_WETTER_PREF].fillna('Egal')
         # Annahme: Fehlende Indoor/Outdoor-Angabe -> Gemischt/Unbekannt

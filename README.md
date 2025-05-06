@@ -1,10 +1,10 @@
-# HSGexplorer 🗺️
+# explore-it 🗺️
 
 **Dein intelligenter Assistent für Aktivitäten in St. Gallen und Umgebung.**
 
 ## Überblick
 
-HSGexplorer ist eine Streamlit-Webanwendung, die entwickelt wurde, um Nutzern bei der Entdeckung und Planung von Freizeitaktivitäten in der Region St. Gallen zu helfen. Die App löst das Problem, aus einer Vielzahl von Möglichkeiten passende Aktivitäten zu finden, indem sie verschiedene Filteroptionen, Wetterinformationen, eine Kartenvisualisierung und KI-gestützte Funktionen kombiniert. (Erfüllt Projektanforderung 1)
+explore-it ist eine Streamlit-Webanwendung, die entwickelt wurde, um Nutzern bei der Entdeckung und Planung von Freizeitaktivitäten in der Region St. Gallen zu helfen. Die App löst das Problem, aus einer Vielzahl von Möglichkeiten passende Aktivitäten zu finden, indem sie verschiedene Filteroptionen, Wetterinformationen, eine Kartenvisualisierung und KI-gestützte Funktionen kombiniert. (Erfüllt Projektanforderung 1)
 
 Die Anwendung bietet:
 * Manuelle Filterung nach Datum, Aktivitätsart, Personenzahl und Budget.

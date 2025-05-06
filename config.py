@@ -1,6 +1,6 @@
 # config.py
 """
-Konfigurationsdatei für die HSGexplorer Streamlit App.
+Konfigurationsdatei für die explore-it Streamlit App.
 
 Dieses Modul zentralisiert alle globalen Konstanten und Konfigurationseinstellungen
 für die Anwendung. Dazu gehören:
@@ -59,8 +59,6 @@ COL_PREIS_INFO: str = 'Preis_Info'
 COL_WETTER_PREF: str = 'Wetter_Praeferenz'
 COL_DATUM_VON: str = 'Datum_Von'
 COL_DATUM_BIS: str = 'Datum_Bis'
-COL_PERSONEN_MIN: str = 'Personen_Min'
-COL_PERSONEN_MAX: str = 'Personen_Max'
 COL_INDOOR_OUTDOOR: str = 'Indoor_Outdoor'
 COL_ZIELGRUPPE: str = 'Zielgruppe' # Wichtig für Empfehlungen
 COL_DAUER_INFO: str = 'Dauer_Info'
@@ -75,7 +73,7 @@ COL_IMAGE_URL: str = 'Image_URL'
 EXPECTED_COLUMNS: list[str] = [
     COL_ID, COL_NAME, COL_BESCHREIBUNG, COL_ART, COL_ORT, COL_ADRESSE, COL_LAT, COL_LON,
     COL_PREIS, COL_PREIS_INFO, COL_WETTER_PREF, COL_DATUM_VON, COL_DATUM_BIS,
-    COL_PERSONEN_MIN, COL_PERSONEN_MAX, COL_INDOOR_OUTDOOR, COL_ZIELGRUPPE,
+    COL_INDOOR_OUTDOOR, COL_ZIELGRUPPE,
     COL_DAUER_INFO, COL_WEBSITE, COL_KONTAKT_TEL, COL_BOOKING_INFO, COL_IMAGE_URL
 ]
 
@@ -149,9 +147,7 @@ LLM_POSSIBLE_ARTEN: list[str] = [
     'Kultur', 'Natur', 'Sightseeing', 'Genuss', 'Familie', 'Sport',
     'Entertainment', 'Shopping', 'Event', 'Wellness', 'Action', 'Freizeit'
 ]
-LLM_POSSIBLE_PERSONEN_KAT: list[str] = [
-    'Alleine', 'Paar', 'Kleingruppe', 'Grossgruppe'
-] # Vereinfachte Kategorien, die das LLM erkennen soll
+
 LLM_POSSIBLE_INDOOR_OUTDOOR: list[str] = [
     'Indoor', 'Outdoor', 'Mixed'
 ]

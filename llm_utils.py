@@ -74,12 +74,11 @@ def get_filters_from_gemini(
     # Definiert die Anweisungen für das LLM.
     # Nutzt f-string, um erlaubte Werte dynamisch aus config.py einzufügen.
     prompt = f"""
-    Du bist ein hilfreicher Assistent für die HSGexplorer App, der Nutzereingaben analysiert, um passende Filterkriterien für Aktivitäten zu extrahieren.
+    Du bist ein hilfreicher Assistent für die explore-it App, der Nutzereingaben analysiert, um passende Filterkriterien für Aktivitäten zu extrahieren.
     Deine Aufgabe ist es, aus der folgenden Nutzeranfrage die relevanten Kriterien zu identifizieren und sie **NUR als gültiges JSON-Objekt** zurückzugeben.
 
     Verfügbare Filter und ihre erwarteten Typen/Werte im JSON:
     - "Art": Eine LISTE von einer oder mehreren Aktivitätenarten. Erlaubte Werte: {config.LLM_POSSIBLE_ARTEN}
-    - "Personen_Anzahl_Kategorie": EIN String, der die Gruppengröße beschreibt. Erlaubte Werte: {config.LLM_POSSIBLE_PERSONEN_KAT}
     - "Preis_Max": Eine ZAHL (Integer oder Float) als Preisobergrenze.
     - "Indoor_Outdoor": EIN String für die Ortspräferenz. Erlaubte Werte: {config.LLM_POSSIBLE_INDOOR_OUTDOOR}
     - "Wetter_Praeferenz": EIN String für die Wetterpräferenz. Erlaubte Werte: {config.LLM_POSSIBLE_WETTER_PREF}
@@ -90,7 +89,7 @@ def get_filters_from_gemini(
     2. Wenn ein Kriterium aus der Anfrage nicht eindeutig hervorgeht oder keinem erlaubten Wert entspricht, lasse den entsprechenden Schlüssel im JSON weg.
     3. Bei "Art" und "Zielgruppe" gib immer eine Liste von Strings zurück (z.B. ["Sport"] oder ["Familie", "Kinder"]).
     4. Bei "Preis_Max" gib nur die Zahl zurück (z.B. 50 oder 25.5).
-    5. Halte dich bei den Werten für "Art", "Personen_Anzahl_Kategorie", "Indoor_Outdoor", "Wetter_Praeferenz" und "Zielgruppe" strikt an die oben genannten erlaubten Werte.
+    5. Halte dich bei den Werten für "Art", "Indoor_Outdoor", "Wetter_Praeferenz" und "Zielgruppe" strikt an die oben genannten erlaubten Werte.
 
     Nutzeranfrage: "{user_query}"
 
@@ -123,11 +122,6 @@ def get_filters_from_gemini(
                 else: filter_dict['Art'] = valid_arten
             else:
                 del filter_dict['Art'] # Entfernen, wenn es keine Liste ist
-
-        # Beispiel für 'Personen_Anzahl_Kategorie':
-        if 'Personen_Anzahl_Kategorie' in filter_dict:
-            if filter_dict['Personen_Anzahl_Kategorie'] not in config.LLM_POSSIBLE_PERSONEN_KAT:
-                del filter_dict['Personen_Anzahl_Kategorie'] # Entfernen, wenn Wert nicht erlaubt
 
         # (Hier könnten analog Validierungen für Indoor_Outdoor, Wetter_Praeferenz, Zielgruppe folgen)
 
@@ -192,7 +186,7 @@ def get_selection_and_justification(
     # Weist das LLM an, aus der Kandidatenliste auszuwählen und die Antwort
     # in einem exakten JSON-Format zu strukturieren.
     prompt = f"""
-    Du bist ein hilfreicher Assistent für die HSGexplorer App. Deine Aufgabe ist es, aus einer Liste potenzieller Aktivitäten die besten Vorschläge basierend auf dem Nutzerwunsch auszuwählen und diese Auswahl zu begründen.
+    Du bist ein hilfreicher Assistent für die explore-it App. Deine Aufgabe ist es, aus einer Liste potenzieller Aktivitäten die besten Vorschläge basierend auf dem Nutzerwunsch auszuwählen und diese Auswahl zu begründen.
 
     Nutzerwunsch: "{user_query}"
 

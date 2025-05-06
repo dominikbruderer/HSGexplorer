@@ -1,6 +1,6 @@
 # ui_components.py
 """
-Funktionen zur Erstellung von UI-Komponenten für die HSGexplorer Streamlit App.
+Funktionen zur Erstellung von UI-Komponenten für die explore-it Streamlit App.
 
 Dieses Modul enthält Funktionen, die für die Erzeugung spezifischer Teile
 der Benutzeroberfläche verantwortlich sind (z.B. Sidebar, Karte, Detailansicht).
@@ -26,7 +26,7 @@ try:
         LOGO_PATH, STATE_SHOW_LLM_RESULTS, STATE_SELECTED_ACTIVITY_INDEX,
         ST_GALLEN_LAT, ST_GALLEN_LON, COL_ID, COL_ART, COL_PREIS, COL_ORT,
         COL_NAME, COL_LAT, COL_LON, COL_WETTER_PREF, COL_DATUM_VON, COL_DATUM_BIS,
-        COL_BESCHREIBUNG, COL_PERSONEN_MIN, COL_PERSONEN_MAX, COL_ZIELGRUPPE,
+        COL_BESCHREIBUNG, COL_ZIELGRUPPE,
         COL_INDOOR_OUTDOOR, COL_DAUER_INFO, COL_WEBSITE, COL_BOOKING_INFO,
         COL_KONTAKT_TEL, COL_IMAGE_URL
     )
@@ -45,7 +45,7 @@ def display_sidebar(
     df: pd.DataFrame,
     today_date: datetime.date,
     openweathermap_api_configured: bool
-    ) -> Tuple[datetime.date, bool, str, str, Optional[float], bool]:
+    ) -> Tuple[datetime.date, bool, str, Optional[float], bool]:
     """
     Erstellt und zeigt die Streamlit Sidebar an und gibt die Filterwerte zurück.
 
@@ -99,7 +99,7 @@ def display_sidebar(
 
         # --- Manuelle Filter Widgets (Dropdowns, Slider) ---
         # Initialisiere Standardwerte
-        activity_type = "Alle"; people_count = "Alle"; budget = None
+        activity_type = "Alle"; budget = None
 
         # Zeige Filter nur an, wenn Aktivitätsdaten vorhanden sind
         if not df.empty:
@@ -118,11 +118,6 @@ def display_sidebar(
                 activity_type = st.selectbox("Aktivitätsart", options=activity_types_options, key="sb_art")
             else:
                  st.caption(f"Spalte '{COL_ART}' fehlt."); st.selectbox("Aktivitätsart", ["Alle"], disabled=True, key="sb_art_disabled")
-
-            # Personen Filter (Dropdown)
-            # Optionen sind hier fest vorgegeben
-            personen_options = ["Alle", "Alleine", "Zu zweit", "Bis 4 Personen", "Mehr als 4 Personen"]
-            people_count = st.selectbox("Anzahl Personen", options=personen_options, key="sb_personen")
 
             # Budget Filter (Slider)
             # Prüfe, ob die Preis-Spalte existiert und mindestens einen Wert enthält
@@ -149,11 +144,10 @@ def display_sidebar(
              st.warning("Keine Aktivitätsdaten geladen. Filter deaktiviert.")
              # Zeige deaktivierte Filter-Widgets an
              st.selectbox("Aktivitätsart", ["Alle"], disabled=True, key="sb_art_disabled_empty")
-             st.selectbox("Anzahl Personen", ["Alle"], disabled=True, key="sb_personen_disabled_empty")
              st.slider("Max. Budget (CHF)", 0, 1, 0, disabled=True, key="sb_budget_disabled_empty")
 
     # Gib die ausgewählten Werte zurück, damit sie in app.py verwendet werden können
-    return selected_date, consider_weather, activity_type, people_count, budget, reset_llm_pressed
+    return selected_date, consider_weather, activity_type, budget, reset_llm_pressed
 
 
 def display_map(
@@ -405,8 +399,6 @@ def display_activity_details(
     website_str = activity_row.get(config.COL_WEBSITE)
     latitude = activity_row.get(config.COL_LAT); longitude = activity_row.get(config.COL_LON)
     dauer_str = activity_row.get(config.COL_DAUER_INFO, "N/A")
-    pers_min_val = activity_row.get(config.COL_PERSONEN_MIN)
-    pers_max_val = activity_row.get(config.COL_PERSONEN_MAX)
     zielgruppe_str = activity_row.get(config.COL_ZIELGRUPPE)
     indoor_outdoor_str = activity_row.get(config.COL_INDOOR_OUTDOOR, "N/A")
     wetter_pref_str = activity_row.get(config.COL_WETTER_PREF, "N/A")
@@ -423,15 +415,6 @@ def display_activity_details(
         if preis_ca_val > 0: preis_str = f"{preis_ca_val:.2f} CHF"
         else: preis_str = "Kostenlos"
     else: preis_str = "Preis N/A"
-    pers_min_str = str(int(pers_min_val)) if pd.notna(pers_min_val) and pers_min_val != float('inf') else "1"
-    if pd.notna(pers_max_val):
-        if pers_max_val == float('inf'): pers_max_str = " nicht begrenzt"
-        else:
-            try: pers_max_str = str(int(pers_max_val))
-            except (ValueError, TypeError): pers_max_str = "?"
-    else: pers_max_str = "?"
-    personen_str = f"{pers_min_str} - {pers_max_str}"
-    if pers_min_str == pers_max_str and pers_max_str != "?": personen_str = pers_min_str
     try:
         von_str = von_datum.strftime('%d.%m.%Y') if pd.notna(von_datum) else None
         bis_str = bis_datum.strftime('%d.%m.%Y') if pd.notna(bis_datum) else None
@@ -525,7 +508,6 @@ def display_activity_details(
                 st.markdown(f"**Zielgruppe:** {zielgruppe_str}")
 
         with detail_col2: # Rechte Spalte für Details
-            st.markdown(f"**Personen:** {personen_str}")
             st.markdown(f"**Dauer ca.:** {dauer_str}")
             st.markdown(f"**Verfügbar:** {verfuegbar_str}")
             # Zeige Buchungsinfo und Telefon nur an, wenn vorhanden
